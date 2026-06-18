@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Generated samples / logs
+tools/sample/*.ipa
+*.log
+
+# Electron desktop app (desktop/)
+desktop/node_modules/
+desktop/out/
+desktop/release/
+desktop/shot-*.png
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Not part of this assessment-tool release: the Electron GUI front-end, the
+# on-device runtime modules, and the active flag-flipping live test are kept out
+# of the public analyzer. This repo is the static assessor + read-only MCP.
+app/gui/
+app/device/
+app/device_ops.py
+build.spec
+version_info.txt
+tools/gui_smoketest.py
+tools/screenshot.py
+tests/test_macho_patch.py
+tests/test_frida_manager.py
+tests/test_ssh_session.py
+docs/0*_*.png
+docs/shot-*.png
