@@ -4,7 +4,7 @@ Exposes the *static assessment* over the Model Context Protocol so other tools /
 agents can request an analysis and receive structured findings + a crackability
 score. This is an ASSESSOR, not an exploit driver: it only reads and reports.
 There are deliberately no tools here that unlock, flip flags, forge receipts, or
-otherwise modify an app — those are out of scope for this server.
+otherwise modify an app. Those are out of scope for this server.
 
 Run:  python mcp_server.py        (stdio transport)
 Deps: pip install mcp
@@ -62,10 +62,10 @@ def scoring_guide() -> dict:
     return {
         "scale": "0 (well-protected) … 100 (trivially crackable)",
         "bands": {
-            "low": "0-39 — strong protections; hard to crack",
-            "moderate": "40-59 — some gaps worth hardening",
-            "high": "60-84 — few effective protections; likely crackable",
-            "critical": "85-100 — wide open / already crack-ready",
+            "low": "0-39: strong protections; hard to crack",
+            "moderate": "40-59: some gaps worth hardening",
+            "high": "60-84: few effective protections; likely crackable",
+            "critical": "85-100: wide open / already crack-ready",
         },
         "note": "cryptid==0 (FairPlay-decrypted) dominates, since a decrypted "
                 "binary is open to static analysis and patching.",

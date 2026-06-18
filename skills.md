@@ -2,13 +2,13 @@
 
 A step-by-step guide (for a human or an AI agent driving the MCP server) on how to
 **search a decrypted `.ipa` for crackability weaknesses and report them**. This is
-an *assessment* workflow — it measures how resistant an app is to piracy / patching
+an *assessment* workflow. It measures how resistant an app is to piracy / patching
 / subscription bypass and produces findings a developer can use to harden the app.
 It does **not** unlock, flip, forge, or modify anything.
 
 > **Authorized use only.** Run against apps you own, apps you are contracted to
 > test, or your own device for research. Use the output to *harden* apps and to
-> document weaknesses — not to bypass paid functionality.
+> document weaknesses, not to bypass paid functionality.
 
 ---
 
@@ -18,7 +18,7 @@ It does **not** unlock, flip, forge, or modify anything.
   - dumped from a jailbroken device you control (the desktop app's Device panel), or
   - supplied by the app owner.
 - Encrypted App Store `.ipa`s will read `cryptid != 0` and most string-based checks
-  will see nothing useful — decrypt first.
+  will see nothing useful, so decrypt first.
 
 ## 2. Run a search
 
@@ -43,7 +43,7 @@ python main.py --cli /abs/path/App.ipa --json report.json --html report.html
 | **Binary hardening** | Missing PIE / stack canary / ARC / PAC = easier to analyze and patch. |
 | **Jailbreak / anti-debug / anti-tamper** | Present = harder dynamic analysis; absent = runs unmodified on a JB device. |
 | **Receipt / subscription validation** | *Local-only* validation is forgeable; *server-validated* is robust. |
-| **Patchable premium / license flags** | Boolean gates (`isPremium`, `isSubscribed`, …) found in the binary — candidates a cracker would flip. **Detected and reported**, so the dev can move the decision server-side. |
+| **Patchable premium / license flags** | Boolean gates (`isPremium`, `isSubscribed`, and similar) found in the binary; candidates a cracker would flip. **Detected and reported**, so the dev can move the decision server-side. |
 | **Hardcoded secrets** | API keys/tokens embedded in the binary (shown in full so the owner can rotate them). |
 | **Weak crypto** | MD5/SHA1/DES/ECB and similar. |
 | **ATS / entitlements / debug artifacts** | Misconfig and leftover debug surface. |
