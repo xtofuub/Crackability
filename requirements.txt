@@ -1,0 +1,6 @@
+# Runtime dependencies (compatible-release pins, tested versions noted)
+PySide6~=6.11      # tested 6.11.1
+lief~=0.17.6       # tested 0.17.6  (Mach-O parsing API is version-sensitive)
+frida~=17.0        # tested 17.12.0 (on-device IPA extraction; optional at runtime)
+paramiko~=3.5      # SSH transport for Wi-Fi device dumps (tunnels to frida-server)
+mcp~=1.0           # read-only assessment MCP server (mcp_server.py)
