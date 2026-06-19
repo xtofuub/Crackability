@@ -27,10 +27,13 @@ It does **not** unlock, flip, forge, or modify anything.
 2. Call `list_checks` to see what will run.
 3. Call `analyze_ipa(ipa_path="/abs/path/App.ipa")` → returns `{ ok, report }`.
 4. Call `scoring_guide` to interpret the band.
+5. For CI ingestion, call `analyze_ipa_sarif` instead (SARIF 2.1.0).
+6. If you also ran an on-device test, call `correlate_reports(static_path, dynamic_path)`
+   to mark each shared weakness suspected / confirmed / refuted.
 
 **Via the CLI** (equivalent, for humans):
 ```
-python main.py --cli /abs/path/App.ipa --json report.json --html report.html
+python main.py --cli /abs/path/App.ipa --json report.json --html report.html --sarif report.sarif
 ```
 
 **Via the desktop app:** Open `.ipa` (or Device → dump) → read the Results screen.
@@ -42,10 +45,13 @@ python main.py --cli /abs/path/App.ipa --json report.json --html report.html
 | **Encryption (FairPlay)** | `cryptid == 0` → binary is decrypted and fully readable/patchable. |
 | **Binary hardening** | Missing PIE / stack canary / ARC / PAC = easier to analyze and patch. |
 | **Jailbreak / anti-debug / anti-tamper** | Present = harder dynamic analysis; absent = runs unmodified on a JB device. |
+| **Commercial protector / obfuscation** | iXGuard, Arxan, Promon, Appdome, Talsec and others. Presence is a strong defensive signal. |
 | **Receipt / subscription validation** | *Local-only* validation is forgeable; *server-validated* is robust. |
 | **Patchable premium / license flags** | Boolean gates (`isPremium`, `isSubscribed`, and similar) found in the binary; candidates a cracker would flip. **Detected and reported**, so the dev can move the decision server-side. |
+| **On-device entitlement storage** | Premium flag cached in a weak Keychain item, NSUserDefaults, or a plist; editable on a jailbroken device with no hooking. |
 | **Hardcoded secrets** | API keys/tokens embedded in the binary (shown in full so the owner can rotate them). |
 | **Weak crypto** | MD5/SHA1/DES/ECB and similar. |
+| **TLS certificate pinning** | Present resists proxy MITM; absent means receipt / entitlement responses can be forged with a proxy. |
 | **ATS / entitlements / debug artifacts** | Misconfig and leftover debug surface. |
 
 ## 4. Interpret the result

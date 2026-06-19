@@ -1,0 +1,22 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        # The engine + test suite only need LIEF (Mach-O parsing) and pytest.
+        # PySide6 / frida / paramiko / mcp are for the GUI, device and MCP server
+        # and are not exercised by the headless tests.
+        run: pip install lief pytest
+      - name: Run tests
+        run: pytest -q
