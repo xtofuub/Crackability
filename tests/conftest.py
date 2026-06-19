@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.analyzer.engine import analyze
-from tools.make_test_ipa import build_ipa
+from tools.make_test_ipa import build_hardened_ipa, build_ipa
 
 
 @pytest.fixture(scope="session")
@@ -17,6 +17,12 @@ def sample_ipa(tmp_path_factory) -> str:
 @pytest.fixture(scope="session")
 def report(sample_ipa):
     return analyze(sample_ipa)
+
+
+@pytest.fixture(scope="session")
+def hardened_report(tmp_path_factory):
+    d = tmp_path_factory.mktemp("hardened")
+    return analyze(build_hardened_ipa(str(d / "Hardened.ipa")))
 
 
 @pytest.fixture

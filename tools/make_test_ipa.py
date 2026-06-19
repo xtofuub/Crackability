@@ -76,8 +76,10 @@ def _seg_name(name: str) -> bytes:
     return name.encode().ljust(16, b"\x00")
 
 
-def build_macho() -> bytes:
-    blob = ("\x00".join(INDICATOR_STRINGS) + "\x00").encode("utf-8")
+def build_macho(indicators: list[str] | None = None, cryptid: int = 0) -> bytes:
+    if indicators is None:
+        indicators = INDICATOR_STRINGS
+    blob = ("\x00".join(indicators) + "\x00").encode("utf-8")
 
     header_size = 32
     seg_cmd_size = 72 + 80          # segment command + one section_64
@@ -107,7 +109,7 @@ def build_macho() -> bytes:
     encryption = struct.pack(
         "<IIIIII",
         LC_ENCRYPTION_INFO_64, enc_cmd_size,
-        headers_total, len(blob), 0, 0,   # cryptid = 0  (decrypted)
+        headers_total, len(blob), cryptid, 0,   # 5th field is cryptid
     )
 
     return header + segment + section + encryption + blob
@@ -136,38 +138,78 @@ def make_png(size: int = 120, rgb=(76, 141, 255)) -> bytes:
             + _png_chunk(b"IEND", b""))
 
 
-def make_info_plist() -> bytes:
+def make_info_plist(ats_arbitrary: bool = True, pinned: bool = False,
+                    name: str = "Demo App", bundle_id: str = "com.example.demoapp") -> bytes:
     info = {
         "CFBundleExecutable": "DemoApp",
-        "CFBundleIdentifier": "com.example.demoapp",
-        "CFBundleDisplayName": "Demo App",
+        "CFBundleIdentifier": bundle_id,
+        "CFBundleDisplayName": name,
         "CFBundleName": "DemoApp",
         "CFBundleShortVersionString": "2.4.1",
         "CFBundleVersion": "2410",
         "MinimumOSVersion": "15.0",
         "CFBundleSupportedPlatforms": ["iPhoneOS"],
         "DTSDKName": "iphoneos17.4",
-        "NSAppTransportSecurity": {"NSAllowsArbitraryLoads": True},
         "CFBundleIcons": {
             "CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon60x60"]}
         },
     }
+    if ats_arbitrary:
+        info["NSAppTransportSecurity"] = {"NSAllowsArbitraryLoads": True}
+    elif pinned:
+        info["NSAppTransportSecurity"] = {
+            "NSPinnedDomains": {"api.revenuecat.com": {"NSIncludesSubdomains": True}}
+        }
     return plistlib.dumps(info)
 
 
-def build_ipa(out_path: str) -> str:
+def build_ipa(out_path: str, indicators: list[str] | None = None, cryptid: int = 0,
+              ats_arbitrary: bool = True, pinned: bool = False,
+              frameworks: tuple[str, ...] = ("Alamofire", "Lottie"),
+              name: str = "Demo App", bundle_id: str = "com.example.demoapp") -> str:
     import zipfile
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     app = "Payload/DemoApp.app/"
     with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr(app + "Info.plist", make_info_plist())
-        z.writestr(app + "DemoApp", build_macho())
+        z.writestr(app + "Info.plist",
+                   make_info_plist(ats_arbitrary, pinned, name, bundle_id))
+        z.writestr(app + "DemoApp", build_macho(indicators, cryptid))
         z.writestr(app + "AppIcon60x60@2x.png", make_png())
         # embedded frameworks (dir names drive SDK fingerprinting)
-        for fw in ("Alamofire", "Lottie"):
+        for fw in frameworks:
             z.writestr(f"{app}Frameworks/{fw}.framework/{fw}", b"\x00stub\x00")
     return out_path
+
+
+# A deliberately well-protected app: encrypted, hardened, server-validated, and
+# pinned. Used to exercise the PASS paths and confirm it scores far lower.
+HARDENED_STRINGS = [
+    # jailbreak detection present
+    "/Applications/Cydia.app", "/bin/bash", "/usr/sbin/sshd",
+    "cydia://package", "IOSSecuritySuite", "isJailbroken",
+    # anti-debug present
+    "PT_DENY_ATTACH", "ptrace", "sysctl", "AmIBeingDebugged",
+    # integrity + injection detection present
+    "_dyld_image_count", "_CodeSignature", "integrityCheck", "MSHookFunction",
+    # commercial protector present
+    "iXGuard", "GuardSquare",
+    # server-validated purchases (no local receipt parsing)
+    "RevenueCat", "api.revenuecat.com", "AppTransaction", "currentEntitlements",
+    # certificate pinning present
+    "TrustKit", "pinnedCertificates", "https://api.revenuecat.com/v1",
+    # strong crypto only
+    "CC_SHA256", "kCCAlgorithmAES",
+]
+
+
+def build_hardened_ipa(out_path: str) -> str:
+    """A well-protected counterpart to the crackable sample (should score low)."""
+    return build_ipa(
+        out_path, indicators=HARDENED_STRINGS, cryptid=1,
+        ats_arbitrary=False, pinned=True, frameworks=("RevenueCat",),
+        name="Hardened App", bundle_id="com.example.hardened",
+    )
 
 
 if __name__ == "__main__":
