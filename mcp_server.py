@@ -11,12 +11,15 @@ Deps: pip install mcp
 """
 from __future__ import annotations
 
+import json
 import os
 
 from mcp.server.fastmcp import FastMCP
 
 from app.analyzer.checks import all_checks
+from app.analyzer.correlate import correlate
 from app.analyzer.engine import analyze
+from app.report import exporter
 
 mcp = FastMCP("ios-crackability-analyzer")
 
@@ -40,6 +43,32 @@ def analyze_ipa(ipa_path: str) -> dict:
         return {"ok": True, "report": report.to_dict()}
     except Exception as exc:  # noqa: BLE001 - report failures as data
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@mcp.tool()
+def analyze_ipa_sarif(ipa_path: str) -> dict:
+    """Analyze a decrypted .ipa and return the findings as SARIF 2.1.0 (for code
+    scanning / CI ingestion). Read-only."""
+    if not ipa_path or not os.path.isfile(ipa_path):
+        return {"ok": False, "error": f"file not found: {ipa_path}"}
+    try:
+        return {"ok": True, "sarif": exporter.build_sarif(analyze(ipa_path))}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@mcp.tool()
+def correlate_reports(static_report_path: str, dynamic_report_path: str) -> dict:
+    """Fuse a static report JSON with an on-device dynamic result JSON, marking
+    each shared weakness as suspected / confirmed / refuted. Read-only."""
+    try:
+        with open(static_report_path, encoding="utf-8") as f:
+            static = json.load(f)
+        with open(dynamic_report_path, encoding="utf-8") as f:
+            dynamic = json.load(f)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": True, "correlation": correlate(static, dynamic)}
 
 
 @mcp.tool()
