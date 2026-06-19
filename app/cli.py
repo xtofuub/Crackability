@@ -39,6 +39,7 @@ def run(argv: list[str] | None = None) -> int:
     p.add_argument("ipa", help="path to a decrypted .ipa file")
     p.add_argument("--json", metavar="PATH", help="write a JSON report to PATH")
     p.add_argument("--html", metavar="PATH", help="write an HTML report to PATH")
+    p.add_argument("--sarif", metavar="PATH", help="write a SARIF 2.1.0 report to PATH")
     p.add_argument("--no-color", action="store_true", help="disable ANSI colours")
     args = p.parse_args(argv)
 
@@ -87,6 +88,9 @@ def run(argv: list[str] | None = None) -> int:
     if args.html:
         exporter.export_html(report, args.html)
         print(f"HTML report  -> {args.html}")
+    if args.sarif:
+        exporter.export_sarif(report, args.sarif)
+        print(f"SARIF report -> {args.sarif}")
 
     return 0
 

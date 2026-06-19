@@ -37,6 +37,72 @@ def export_json(report: AnalysisReport, path: str) -> None:
         json.dump(report.to_dict(), fh, indent=2, ensure_ascii=False)
 
 
+# SARIF level per check status (error / warning / note / none).
+_SARIF_LEVEL = {
+    "FAIL": "error", "WARN": "warning", "INFO": "note",
+    "PASS": "none", "ERROR": "note",
+}
+
+
+def build_sarif(report: AnalysisReport) -> dict:
+    """Render the report as SARIF 2.1.0 so findings flow into code-scanning / CI."""
+    artifact = report.bundle.bundle_id or report.bundle.executable_name or "app.ipa"
+    rules: list[dict] = []
+    results: list[dict] = []
+    seen: set[str] = set()
+    for r in report.results:
+        if r.check_id not in seen:
+            seen.add(r.check_id)
+            rules.append({
+                "id": r.check_id,
+                "name": "".join(w.capitalize() for w in r.check_id.split("_")),
+                "shortDescription": {"text": r.title},
+                "fullDescription": {"text": r.explanation or r.title},
+                "help": {"text": r.remediation or ""},
+                "properties": {"category": r.category},
+            })
+        msg = r.summary
+        if r.findings:
+            ev = "; ".join(f.label for f in r.findings[:8])
+            msg = f"{msg}\nEvidence: {ev}"
+        results.append({
+            "ruleId": r.check_id,
+            "level": _SARIF_LEVEL.get(r.status.value, "note"),
+            "message": {"text": msg},
+            "properties": {
+                "severity": r.severity.value,
+                "risk": round(r.risk, 3),
+                "weight": r.weight,
+                "status": r.status.value,
+            },
+            "locations": [{
+                "physicalLocation": {"artifactLocation": {"uri": artifact}}
+            }],
+        })
+    return {
+        "version": "2.1.0",
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "runs": [{
+            "tool": {"driver": {
+                "name": "iOS Crackability Analyzer",
+                "informationUri": "https://github.com/xtofuub/Crackability",
+                "version": report.tool_version or "1.0",
+                "rules": rules,
+            }},
+            "properties": {
+                "crackabilityScore": report.score,
+                "verdict": report.verdict,
+            },
+            "results": results,
+        }],
+    }
+
+
+def export_sarif(report: AnalysisReport, path: str) -> None:
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(build_sarif(report), fh, indent=2, ensure_ascii=False)
+
+
 def _gauge_svg(score: int, color: str, size: int = 160) -> str:
     r = size / 2 - 14
     cx = cy = size / 2
