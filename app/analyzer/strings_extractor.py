@@ -38,7 +38,8 @@ def extract_strings(data: bytes, min_len: int = 4, max_strings: int = 400_000) -
     return list(seen.keys())
 
 
-def extract_from_file(path: str, min_len: int = 4, max_bytes: int = 400 * 1024 * 1024) -> list[str]:
+def extract_from_file(path: str, min_len: int = 4, max_bytes: int = 400 * 1024 * 1024,
+                      max_strings: int = 400_000) -> list[str]:
     with open(path, "rb") as fh:
         data = fh.read(max_bytes)
-    return extract_strings(data, min_len=min_len)
+    return extract_strings(data, min_len=min_len, max_strings=max_strings)

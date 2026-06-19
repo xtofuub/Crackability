@@ -91,6 +91,34 @@ def _select_slice(binaries: list):
     return arm64 or arm64e or (binaries[0] if binaries else None)
 
 
+def collect_symbols(path: str) -> set[str]:
+    """Best-effort imported + exported + all symbol and library names from a
+    Mach-O. Used to fold embedded frameworks / app extensions into the analysis.
+    Returns an empty set for anything that is not a parseable Mach-O."""
+    if not _HAS_LIEF:
+        return set()
+    try:
+        fat = lief.MachO.parse(path)
+    except Exception:
+        return set()
+    if fat is None:
+        return set()
+    try:
+        binaries = list(fat)
+    except Exception:
+        binaries = [fat]
+    b = _select_slice(binaries)
+    if b is None:
+        return set()
+    out: set[str] = set()
+    for attr in ("imported_functions", "exported_functions", "symbols", "libraries"):
+        try:
+            out.update(_names(getattr(b, attr, [])))
+        except Exception:
+            pass
+    return out
+
+
 def parse_macho(path: str) -> MachOInfo:
     info = MachOInfo(path=path)
     try:

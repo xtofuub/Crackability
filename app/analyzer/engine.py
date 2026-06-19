@@ -3,21 +3,105 @@ from __future__ import annotations
 
 import logging
 import os
+import plistlib
 import shutil
 import tempfile
 from typing import Callable, Optional
 
 from .. import __version__
-from . import scoring
+from . import demangle, scoring
 
 log = logging.getLogger(__name__)
 from .checks import all_checks
 from .ipa_loader import load_ipa
-from .macho_binary import parse_macho
+from .macho_binary import collect_symbols, parse_macho
 from .models import AnalysisContext, AnalysisReport, MachOInfo
 from .strings_extractor import extract_from_file
 
 ProgressFn = Optional[Callable[[int, str], None]]
+
+# Bounds so a huge app with many large frameworks can't blow up analysis.
+_MAX_EMBEDDED = 60
+_EMB_MAX_BYTES = 80 * 1024 * 1024
+_EMB_STRING_BUDGET = 120_000
+
+
+def _bundle_exe(bundle_dir: str, fallback_name: str) -> Optional[str]:
+    """Resolve a sub-bundle's executable (Info.plist CFBundleExecutable, else the
+    same-named file)."""
+    try:
+        with open(os.path.join(bundle_dir, "Info.plist"), "rb") as fh:
+            exe = (plistlib.load(fh) or {}).get("CFBundleExecutable")
+        if exe:
+            p = os.path.join(bundle_dir, exe)
+            if os.path.isfile(p):
+                return p
+    except Exception:
+        pass
+    p = os.path.join(bundle_dir, fallback_name)
+    return p if os.path.isfile(p) else None
+
+
+def _embedded_binaries(bundle) -> list[str]:
+    """Main-binary-adjacent Mach-Os worth scanning: embedded frameworks, app
+    extensions and their nested frameworks, and dylibs."""
+    out: list[str] = []
+    app = bundle.app_path
+    for sub in ("Frameworks", "PlugIns"):
+        d = os.path.join(app, sub)
+        if not os.path.isdir(d):
+            continue
+        for entry in sorted(os.listdir(d)):
+            p = os.path.join(d, entry)
+            if entry.endswith(".framework") and os.path.isdir(p):
+                exe = _bundle_exe(p, entry[: -len(".framework")])
+                if exe:
+                    out.append(exe)
+            elif entry.endswith((".appex", ".app")) and os.path.isdir(p):
+                exe = _bundle_exe(p, entry.split(".")[0])
+                if exe:
+                    out.append(exe)
+                nested = os.path.join(p, "Frameworks")
+                if os.path.isdir(nested):
+                    for fw in sorted(os.listdir(nested)):
+                        if fw.endswith(".framework"):
+                            fp = _bundle_exe(os.path.join(nested, fw), fw[: -len(".framework")])
+                            if fp:
+                                out.append(fp)
+            elif entry.endswith(".dylib") and os.path.isfile(p):
+                out.append(p)
+    return out[:_MAX_EMBEDDED]
+
+
+def _is_macho(path: str) -> bool:
+    try:
+        with open(path, "rb") as fh:
+            magic = fh.read(4)
+        return magic in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe",
+                         b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce",
+                         b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca")
+    except Exception:
+        return False
+
+
+def _scan_embedded(bundle) -> tuple[list[str], set[str], list[str]]:
+    """Fold embedded frameworks / extensions into the analysis: their strings and
+    symbols (where RevenueCat, protectors, pinning libraries actually live)."""
+    extra_strings: list[str] = []
+    extra_symbols: set[str] = set()
+    scanned: list[str] = []
+    for p in _embedded_binaries(bundle):
+        if not _is_macho(p):
+            continue
+        try:
+            extra_symbols |= collect_symbols(p)
+            if len(extra_strings) < _EMB_STRING_BUDGET:
+                extra_strings.extend(
+                    extract_from_file(p, max_bytes=_EMB_MAX_BYTES, max_strings=80_000))
+            scanned.append(os.path.basename(p))
+        except Exception:
+            log.debug("embedded scan failed: %s", p, exc_info=True)
+    return extra_strings[:_EMB_STRING_BUDGET], extra_symbols, scanned
 
 
 def _emit(progress: ProgressFn, pct: int, msg: str) -> None:
@@ -51,11 +135,21 @@ def analyze(ipa_path: str, progress: ProgressFn = None) -> AnalysisReport:
         _emit(progress, 22, "Parsing Mach-O executable…")
         macho: MachOInfo = parse_macho(bundle.executable_path)
 
-        _emit(progress, 42, "Extracting strings…")
+        _emit(progress, 40, "Extracting strings…")
         strings = extract_from_file(bundle.executable_path)
+        symbols = set(macho.imported_symbols) | set(macho.exported_symbols)
+
+        _emit(progress, 50, "Scanning embedded frameworks & extensions…")
+        emb_strings, emb_symbols, scanned = _scan_embedded(bundle)
+        if scanned:
+            log.info("scanned %d embedded binaries: %s", len(scanned), ", ".join(scanned[:12]))
+        strings = strings + emb_strings
+        symbols |= emb_symbols
+
+        _emit(progress, 56, "De-mangling Swift symbols…")
+        symbols |= demangle.enrich(symbols)
 
         _emit(progress, 58, "Building analysis context…")
-        symbols = set(macho.imported_symbols) | set(macho.exported_symbols)
         framework_tokens = _framework_search_tokens(bundle)
         ctx = AnalysisContext(
             bundle=bundle,
