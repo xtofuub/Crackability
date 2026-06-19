@@ -7,8 +7,8 @@ from app.analyzer.models import Severity, Status
 def test_report_shape(report):
     assert 0 <= report.score <= 100
     assert report.verdict in {"Low", "Moderate", "High", "Very High"}
-    assert len(report.results) == 13
-    assert sum(report.counts.values()) == 13
+    assert len(report.results) == 16
+    assert sum(report.counts.values()) == 16
 
 
 def test_macho_parsed(report):
@@ -48,6 +48,28 @@ def test_patchable_flags_detected(by_id):
     labels = {f.label for f in r.findings}
     # seeded gates: isPremiumUnlocked → isPremium, hasValidLicense, unlockAll, removeAds
     assert {"hasValidLicense", "removeAds"} <= labels
+
+
+def test_entitlement_storage_detected(by_id):
+    r = by_id("entitlement_storage")
+    assert r.status is Status.WARN
+    assert r.weight > 0
+    labels = {f.label for f in r.findings}
+    # seeded weak keychain access class is surfaced
+    assert "kSecAttrAccessibleAlways" in labels
+
+
+def test_protector_absent_is_informational(by_id):
+    r = by_id("protector")
+    # the sample ships no recognized protector
+    assert r.status is Status.INFO
+    assert r.weight == 0.0
+
+
+def test_ssl_pinning_absent_warns(by_id):
+    r = by_id("ssl_pinning")
+    # sample has network surface (verifyReceipt URL) and no pinning tokens
+    assert r.status is Status.WARN
 
 
 def test_jailbreak_detected(by_id):

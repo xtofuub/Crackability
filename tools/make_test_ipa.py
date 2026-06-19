@@ -50,6 +50,10 @@ INDICATOR_STRINGS = [
     "unlockAllFeatures",
     "removeAds",
     "isSubscribed",
+    # on-device entitlement storage -> should WARN (editable, no hook needed)
+    "kSecAttrAccessibleAlways",
+    "NSUserDefaults",
+    "entitlements.plist",
     # weak crypto / unsafe
     "CC_MD5",
     "kCCOptionECBMode",

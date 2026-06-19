@@ -330,6 +330,73 @@ HARDENING_SDK_TOKENS = [
 ]
 
 # --------------------------------------------------------------------------- #
+#  Commercial protectors / packers / obfuscators
+# --------------------------------------------------------------------------- #
+# Distinctive tokens (install names, runtime strings, vendor markers) keyed by
+# product label. Presence is a strong defensive signal and names the product.
+PROTECTORS = {
+    "iXGuard / DexGuard (GuardSquare)": ["iXGuard", "DexGuard", "GuardSquare"],
+    "Arxan / Digital.ai": ["Arxan", "EnsureIT", "GuardIT"],
+    "Promon SHIELD": ["Promon", "no.promon", "PromonShield"],
+    "Appdome": ["Appdome", "com.appdome"],
+    "Talsec freeRASP": ["Talsec", "freeRASP", "TalsecRuntime"],
+    "Verimatrix / whiteCryption": ["Verimatrix", "whiteCryption", "SmartProtection"],
+    "DexProtector (Licel)": ["DexProtector"],
+    "AppSealing": ["AppSealing", "AppSealingEngine"],
+    "LIAPP": ["LIAPP"],
+    "nProtect (INCA)": ["nProtect", "TachyonAppGuard"],
+    "Jscrambler": ["Jscrambler"],
+    "SwiftShield (obfuscation)": ["SwiftShield"],
+    "Obfuscator-LLVM": ["obfuscator-llvm", "ollvm"],
+}
+# Mach-O section / segment name fragments some protectors add.
+PROTECTOR_SECTIONS = [
+    "__ixguard", "__arxan", "__promon", "__appdome", "__guardsq",
+    "__llvm_obf", "__dexp", "__obfu",
+]
+
+# --------------------------------------------------------------------------- #
+#  On-device entitlement storage (editable on a jailbroken device, no hook)
+# --------------------------------------------------------------------------- #
+# Keychain accessibility classes that leave an item readable whenever the device
+# is unlocked (weaker than ...WhenUnlockedThisDeviceOnly + access control).
+WEAK_KEYCHAIN_ACCESS = [
+    "kSecAttrAccessibleAlways",
+    "kSecAttrAccessibleAlwaysThisDeviceOnly",
+    "AccessibleAlways",
+]
+# NSUserDefaults usage. Defaults are a plain plist a jailbroken user can edit.
+USERDEFAULTS_TOKENS = [
+    "NSUserDefaults", "standardUserDefaults", "setBool:forKey:",
+]
+# Known on-device caches of entitlement / customer-info state (UserDefaults,
+# plist or keychain) that a cracker can edit directly to flip to premium.
+ENTITLEMENT_CACHE_KEYS = [
+    "RCBackup", "rc_purchaserInfo", "purchaserInfo",
+    "AdaptyProfile", "adapty_profile",
+    "qonversion_user", "entitlements.plist", "subscription_status.plist",
+    "premium.plist", "license.plist",
+]
+
+# --------------------------------------------------------------------------- #
+#  TLS certificate / public-key pinning
+# --------------------------------------------------------------------------- #
+# Strong, specific pinning indicators (generic SecTrustEvaluate is intentionally
+# excluded; it appears in apps that do no pinning at all).
+PINNING_TOKENS = [
+    "TrustKit", "TSKPinningValidator", "TSKPublicKeyHashes", "kTSKPinnedDomains",
+    "pinnedCertificates", "publicKeyHashes", "SSLPinningMode",
+    "PinnedCertificatesTrustEvaluator", "PublicKeysTrustEvaluator",
+    "ServerTrustManager", "certificatePinning", "evaluateForPinning",
+    "AFSSLPinningModePublicKey", "AFSSLPinningModeCertificate",
+]
+# Indicators that the app makes network calls at all (so missing pinning matters).
+NETWORK_SURFACE = [
+    "https://", "http://", "NSURLSession", "URLSession", "CFNetwork",
+    "Alamofire", "AFNetworking", "cronet",
+]
+
+# --------------------------------------------------------------------------- #
 #  Debug / non-production artifacts
 # --------------------------------------------------------------------------- #
 DEBUG_ARTIFACTS = [
